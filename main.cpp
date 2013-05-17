@@ -306,6 +306,10 @@ void son()
 			int count = read(fd1[0], ip, len);
 			if (count != len) {
 				fprintf(stderr, "son: read ip, len=%d count=%d\n", len, count);
+				for (int i = 0; i < count; ++i)
+					fprintf(stderr, "%c", ip[i]);
+				fprintf(stderr, "\n");
+
 				continue;
 			}
 			printf("son: ip=%s\n", ip);
@@ -313,6 +317,9 @@ void son()
 			count = read(fd1[0], mac, len);
 			if (count != len) {
 				fprintf(stderr, "son: read mac, len=%d count=%d\n", len, count);
+				for (int i = 0; i < count; ++i)
+					fprintf(stderr, "%c", mac[i]);
+				fprintf(stderr, "\n");
 				continue;
 			}
 			printf("son: mac=%s\n", mac);
