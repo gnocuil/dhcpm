@@ -266,7 +266,7 @@ void html_write(char* htmlfile)
 			fprintf(fout, "\t<td>%d</td>\n", info.in_pkts);
 			fprintf(fout, "\t<td>%d</td>\n", info.out_bytes);
 			fprintf(fout, "\t<td>%d</td>\n", info.in_bytes);
-			fprintf(fout, "\t<td>%s</td>\n", remainingtime(servertime - info.seconds, true).c_str());
+			fprintf(fout, "\t<td>%s</td>\n", info.seconds <= 0 ? "N/A" : remainingtime(servertime - info.seconds, true).c_str());
 			fprintf(fout, "</tr>\n");
 		}
 		it++;
@@ -315,7 +315,18 @@ void son()
 			int len2 = *(int*)(buf + 4 + len1);
 			memcpy(mac, buf + 4 + len1 + 4, len2);
 			printf("son: ip=%s mac=%s\n", ip, mac);
-			
+			struct in_addr ipaddr;
+			inet_pton(AF_INET, ip, &ipaddr);
+			printf("ip=%x\n", ipaddr.s_addr);
+			if (!mp_valid.count(ipaddr.s_addr)) {
+				mp_valid[ipaddr.s_addr] = true;
+				mp_ether[ipaddr.s_addr] = mac;
+				mp_ip[ipaddr.s_addr] = Info();
+			} else if (mp_ether[ipaddr.s_addr] != mac) {
+				mp_ether[ipaddr.s_addr] = mac;
+				mp_ip[ipaddr.s_addr].clear();
+			}
+			write(fd2[1], &(mp_ip[ipaddr.s_addr]), sizeof(Info));
 		} else if (FD_ISSET(raw_fd, &set)) {
 			char buf[2000];
 			int count = recv(raw_fd, buf, 2000, 0);
@@ -326,7 +337,7 @@ void son()
 			//cout << "ip_v=" << iphdr->ip_v << endl;
 			struct timeval tv;
 			gettimeofday(&tv, 0);
-			if (mp_valid[iphdr->ip_src.s_addr]) {
+			if (mp_valid.count(iphdr->ip_src.s_addr)) {
 				mp_ip[iphdr->ip_src.s_addr].out_pkts ++;
 				mp_ip[iphdr->ip_src.s_addr].out_bytes += count;
 				mp_ip[iphdr->ip_src.s_addr].seconds = tv.tv_sec;
@@ -335,13 +346,6 @@ void son()
 				mp_ip[iphdr->ip_dst.s_addr].in_pkts ++;
 				mp_ip[iphdr->ip_dst.s_addr].in_bytes += count;
 			}
-			/*
-			if (memcmp(mp_ip[iphdr->ip_src.s_addr].eth, eth->h_source, 6) != 0) {
-				printf("NE: %s\n", mactostr((unsigned char*)eth->h_source).c_str());
-			} else {
-				puts("EQ!");
-			}
-			*/
 		}
 	}
 }
