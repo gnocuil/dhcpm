@@ -280,7 +280,7 @@ void html_write(char* htmlfile)
 			fprintf(fout, "\t<td>%d</td>\n", info.in_pkts);
 			fprintf(fout, "\t<td>%s</td>\n", bytes(info.out_bytes).c_str());
 			fprintf(fout, "\t<td>%s</td>\n", bytes(info.in_bytes).c_str());
-			fprintf(fout, "\t<td>%s</td>\n", info.seconds <= 0 ? "N/A" : remainingtime(servertime - info.seconds, true).c_str());
+			fprintf(fout, "\t<td>%s</td>\n", info.seconds <= 0 ? "N/A" : remainingtime(timer - info.seconds, true).c_str());
 			fprintf(fout, "</tr>\n");
 		}
 		it++;
