@@ -236,13 +236,13 @@ void html_write(char* htmlfile)
 	int id = 1;
 	for (int i = 0; i < leases.size(); ++i) {
 		if (it->check) {
-			uint8_t byte;
-			byte = (uint8_t)it->ip.size();
-			write(fd1[1], &byte, 1);
-			write(fd1[1], it->ip.c_str(), it->ip.size());
-			byte = (uint8_t)it->ethernet.size();
-			write(fd1[1], &byte, 1);
-			write(fd1[1], it->ethernet.c_str(), it->ethernet.size());
+			int len;
+			len = it->ip.size();
+			write(fd1[1], &len, sizeof(len));
+			write(fd1[1], it->ip.c_str(), len);
+			len = it->ethernet.size();
+			write(fd1[1], &len, sizeof(len));
+			write(fd1[1], it->ethernet.c_str(), len);
 			
 			Info info;
 			memset(&info, 0, sizeof(info));
@@ -298,10 +298,10 @@ void son()
 			continue;
 		}
 		if (FD_ISSET(fd1[0], &set)) {
-			uint8_t len;
+			int len;
 			char ip[100] = {0};
 			char mac[100] = {0};
-			if (read(fd1[0], &len, 1) != 1)
+			if (read(fd1[0], &len, sizeof(len)) != sizeof(len))
 				continue;
 			int count = read(fd1[0], ip, len);
 			if (count != len) {
@@ -309,11 +309,10 @@ void son()
 				for (int i = 0; i < count; ++i)
 					fprintf(stderr, "%c", ip[i]);
 				fprintf(stderr, "\n");
-
 				continue;
 			}
 			printf("son: ip=%s\n", ip);
-			if (read(fd1[0], &len, 1) != 1)
+			if (read(fd1[0], &len, sizeof(len)) != sizeof(len))
 			count = read(fd1[0], mac, len);
 			if (count != len) {
 				fprintf(stderr, "son: read mac, len=%d count=%d\n", len, count);
