@@ -304,13 +304,17 @@ void son()
 			if (read(fd1[0], &len, 1) != 1)
 				continue;
 			int count = read(fd1[0], ip, len);
-			if (count != len)
+			if (count != len) {
+				fprintf(stderr, "son: read ip, len=%d count=%d\n", len, count);
 				continue;
+			}
 			printf("son: ip=%s\n", ip);
 			if (read(fd1[0], &len, 1) != 1)
 			count = read(fd1[0], mac, len);
-			if (count != len)
+			if (count != len) {
+				fprintf(stderr, "son: read mac, len=%d count=%d\n", len, count);
 				continue;
+			}
 			printf("son: mac=%s\n", mac);
 			
 		} else if (FD_ISSET(raw_fd, &set)) {
