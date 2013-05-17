@@ -310,27 +310,11 @@ void son()
 			printf("son: read %d bytes\n", count);
 			char ip[100] = {0};
 			char mac[100] = {0};
-			if (read(fd1[0], &len, sizeof(len)) != sizeof(len))
-				continue;
-			count = read(fd1[0], ip, len);
-			if (count != len) {
-				fprintf(stderr, "son: read ip, len=%d count=%d\n", len, count);
-				for (int i = 0; i < count; ++i)
-					fprintf(stderr, "%c", ip[i]);
-				fprintf(stderr, "\n");
-				continue;
-			}
-			printf("son: ip=%s\n", ip);
-			if (read(fd1[0], &len, sizeof(len)) != sizeof(len))
-			count = read(fd1[0], mac, len);
-			if (count != len) {
-				fprintf(stderr, "son: read mac, len=%d count=%d\n", len, count);
-				for (int i = 0; i < count; ++i)
-					fprintf(stderr, "%c", mac[i]);
-				fprintf(stderr, "\n");
-				continue;
-			}
-			printf("son: mac=%s\n", mac);
+			int len1 = *(int*)buf;
+			memcpy(ip, buf + 4, len1);
+			int len2 = *(int*)(buf + 4 + len1);
+			memcpy(mac, buf + 4 + len1 + 4, len2);
+			printf("son: ip=%s mac=%s\n", ip, mac);
 			
 		} else if (FD_ISSET(raw_fd, &set)) {
 			char buf[2000];
