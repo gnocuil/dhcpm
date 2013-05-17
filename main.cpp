@@ -239,6 +239,7 @@ void html_write(char* htmlfile)
 			int len;
 			len = it->ip.size();
 			write(fd1[1], &len, sizeof(len));
+			while (1);
 			write(fd1[1], it->ip.c_str(), len);
 			len = it->ethernet.size();
 			write(fd1[1], &len, sizeof(len));
