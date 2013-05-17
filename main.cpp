@@ -29,8 +29,8 @@ struct lease {
 
 struct Info {
 //	char eth[6];
-	uint64_t in_pkts;//Internet->host
-	uint64_t out_pkts;//Internet<-host
+	uint32_t in_pkts;//Internet->host
+	uint32_t out_pkts;//Internet<-host
 	uint64_t in_bytes;
 	uint64_t out_bytes;
 	time_t seconds;
@@ -175,6 +175,20 @@ string remainingtime(time_t time, bool active = false)
 		return buf;
 }
 
+string bytes(uint64_t b)
+{
+	char buf[100] = {0};
+	if (b >= 1024 * 1024 * 1024)
+		sprintf(buf, "%.2lf GB", b / (1024.0 * 1024.0 * 1024.0));
+	else if (b >= 1024 * 1024)
+		sprintf(buf, "%.2lf MB", b / (1024.0 * 1024.0));
+	else if (b >= 1024)
+		sprintf(buf, "%.2lf KB", b / 1024.0);
+	else
+		sprintf(buf, "%d B", (uint32_t)b);
+	return buf;
+}
+
 void html_write(char* htmlfile)
 {
 	FILE *fout = fopen((string(htmlfile) + ".buf").c_str(), "w");
@@ -264,8 +278,8 @@ void html_write(char* htmlfile)
 			fprintf(fout, "\t<td>%s</td>\n", remainingtime(calctime(it->ends.c_str()) - servertime).c_str());
 			fprintf(fout, "\t<td>%d</td>\n", info.out_pkts);
 			fprintf(fout, "\t<td>%d</td>\n", info.in_pkts);
-			fprintf(fout, "\t<td>%d</td>\n", info.out_bytes);
-			fprintf(fout, "\t<td>%d</td>\n", info.in_bytes);
+			fprintf(fout, "\t<td>%s</td>\n", bytes(info.out_bytes).c_str());
+			fprintf(fout, "\t<td>%s</td>\n", bytes(info.in_bytes).c_str());
 			fprintf(fout, "\t<td>%s</td>\n", info.seconds <= 0 ? "N/A" : remainingtime(servertime - info.seconds, true).c_str());
 			fprintf(fout, "</tr>\n");
 		}
