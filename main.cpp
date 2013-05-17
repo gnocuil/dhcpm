@@ -14,6 +14,7 @@
 #include <linux/if_ether.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 
 using namespace std;
 
@@ -26,16 +27,20 @@ struct lease {
 	bool check;
 }; 
 
-struct info {
-	string eth;
-	uint64_t in_pkts;
-	uint64_t out_pkts;
+struct Info {
+//	char eth[6];
+	uint64_t in_pkts;//Internet->host
+	uint64_t out_pkts;//Internet<-host
 	uint64_t in_bytes;
 	uint64_t out_bytes;
 	time_t seconds;
 	
-	void clear(const string& neweth) {
-		eth = neweth;
+//	void clear(char neweth[6]) {
+	Info() {
+		clear();
+	}
+	void clear() {
+//		memcpy(eth, neweth, 6);
 		in_pkts = 0;
 		out_pkts = 0;
 		in_bytes = 0;
@@ -50,6 +55,10 @@ int fd2[2];//father <- son
 list<lease> leases;
 map<string, string> mp;
 map<string, list<lease>::iterator> mp_p;
+
+map<uint32_t, Info> mp_ip;
+map<uint32_t, bool> mp_valid;
+map<uint32_t, string> mp_ether;
 
 bool startsWith(const string& a, const string& b)
 {
@@ -95,7 +104,7 @@ time_t calctime(const char* time)
 int lease_read(char* leasefile)
 {
 	FILE *fin = fopen(leasefile, "r");
-	if (!fin) return false;
+	if (!fin) return -1;
 	leases.clear();
 	mp.clear();
 	mp_p.clear();
@@ -145,11 +154,13 @@ int lease_read(char* leasefile)
 	}
 	fclose(fin);
 	printf("Total leases: %d\n", leases.size());
-	return true;
+	return 0;
 }
 
-string remainingtime(time_t time)
+string remainingtime(time_t time, bool active = false)
 {
+	if (active && time < 3)
+		return "Just Now";
 	char buf[1000] = {0};
 	if (time >= 3600) {
 		sprintf(buf, "%dh %dm %ds", time / 3600, (time % 3600) / 60, time % 60);
@@ -158,7 +169,10 @@ string remainingtime(time_t time)
 	} else {
 		sprintf(buf, "%ds", time);
 	}
-	return buf;
+	if (active)
+		return string(buf) + " ago";
+	else
+		return buf;
 }
 
 void html_write(char* htmlfile)
@@ -215,13 +229,25 @@ void html_write(char* htmlfile)
 	fprintf(fout, "\t<th>Download Packets</th>\n");
 	fprintf(fout, "\t<th>Upload Bytes</th>\n");
 	fprintf(fout, "\t<th>Download Bytes</th>\n");
-	fprintf(fout, "\t<th>Last Communication</th>\n");
+	fprintf(fout, "\t<th>Last Active</th>\n");
 	fprintf(fout, "</tr>\n");
 	
 	it = leases.begin();
 	int id = 1;
 	for (int i = 0; i < leases.size(); ++i) {
 		if (it->check) {
+			uint8_t byte;
+			byte = (uint8_t)it->ip.size();
+			write(fd1[1], &byte, 1);
+			write(fd1[1], it->ip.c_str(), it->ip.size());
+			byte = (uint8_t)it->ethernet.size();
+			write(fd1[1], &byte, 1);
+			write(fd1[1], it->ethernet.c_str(), it->ethernet.size());
+			
+			Info info;
+			memset(&info, 0, sizeof(info));
+			int count = read(fd2[0], &info, sizeof(info));
+			
 			fprintf(fout, "<tr>\n");
 			fprintf(fout, "\t<td>%d</td>\n", id++);
 			fprintf(fout, "\t<td>%s</td>\n", it->ip.c_str());
@@ -230,11 +256,11 @@ void html_write(char* htmlfile)
 			fprintf(fout, "\t<td>%s</td>\n", it->starts.c_str());
 			fprintf(fout, "\t<td>%s</td>\n", it->ends.c_str());
 			fprintf(fout, "\t<td>%s</td>\n", remainingtime(calctime(it->ends.c_str()) - servertime).c_str());
-			fprintf(fout, "\t<td>%d</td>\n", 0);
-			fprintf(fout, "\t<td>%d</td>\n", 0);
-			fprintf(fout, "\t<td>%d</td>\n", 0);
-			fprintf(fout, "\t<td>%d</td>\n", 0);
-			fprintf(fout, "\t<td>%s ago</td>\n", "TODO");
+			fprintf(fout, "\t<td>%d</td>\n", info.out_pkts);
+			fprintf(fout, "\t<td>%d</td>\n", info.in_pkts);
+			fprintf(fout, "\t<td>%d</td>\n", info.out_bytes);
+			fprintf(fout, "\t<td>%d</td>\n", info.in_bytes);
+			fprintf(fout, "\t<td>%s</td>\n", remainingtime(servertime - info.seconds, true).c_str());
 			fprintf(fout, "</tr>\n");
 		}
 		it++;
@@ -246,9 +272,16 @@ void html_write(char* htmlfile)
 	rename((string(htmlfile) + ".buf").c_str(), htmlfile);
 }
 
+string mactostr(unsigned char mac[6])
+{
+	char buf[50] = {0};
+	sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	return buf;
+}
+
 void son()
 {
-	int raw_fd = socket(AF_PACKET, SOCK_DGRAM, htons(ETH_P_ALL));
+	int raw_fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (raw_fd < 0) {
 		fprintf(stderr, "Error creating socket\n");
 		return;
@@ -265,14 +298,47 @@ void son()
 			continue;
 		}
 		if (FD_ISSET(fd1[0], &set)) {
-			uint32_t ip;
-			int count = read(fd1[0], &ip, 4);
-			printf("son: pipe read %d bytes\n", count);
+			uint8_t len;
+			char ip[100] = {0};
+			char mac[100] = {0};
+			if (read(fd1[0], &len, 1) != 1)
+				continue;
+			int count = read(fd1[0], ip, len);
+			if (count != len)
+				continue;
+			printf("son: ip=%s\n", ip);
+			if (read(fd1[0], &len, 1) != 1)
+			count = read(fd1[0], mac, len);
+			if (count != len)
+				continue;
+			printf("son: mac=%s\n", mac);
+			
 		} else if (FD_ISSET(raw_fd, &set)) {
 			char buf[2000];
 			int count = recv(raw_fd, buf, 2000, 0);
-			printf("son: socket read %d bytes\n", count);
-			
+			struct ip *iphdr = (struct ip *)(buf + 14);
+			if (iphdr->ip_v != 4)
+				continue;
+			struct ethhdr *eth = (struct ethhdr*)buf;
+			//cout << "ip_v=" << iphdr->ip_v << endl;
+			struct timeval tv;
+			gettimeofday(&tv, 0);
+			if (mp_valid[iphdr->ip_src.s_addr]) {
+				mp_ip[iphdr->ip_src.s_addr].out_pkts ++;
+				mp_ip[iphdr->ip_src.s_addr].out_bytes += count;
+				mp_ip[iphdr->ip_src.s_addr].seconds = tv.tv_sec;
+			}
+			if (mp_valid[iphdr->ip_dst.s_addr]) {
+				mp_ip[iphdr->ip_dst.s_addr].in_pkts ++;
+				mp_ip[iphdr->ip_dst.s_addr].in_bytes += count;
+			}
+			/*
+			if (memcmp(mp_ip[iphdr->ip_src.s_addr].eth, eth->h_source, 6) != 0) {
+				printf("NE: %s\n", mactostr((unsigned char*)eth->h_source).c_str());
+			} else {
+				puts("EQ!");
+			}
+			*/
 		}
 	}
 }
@@ -302,7 +368,7 @@ int main(int argc, char *argv[])
 	}
 	char ip[4] = {0x1, 0x2, 0x3, 0x4};
 	while (1) {
-		if (lease_read(argv[1]))
+		if (lease_read(argv[1]) >= 0)
 			html_write(argv[2]);
 //		break;
 		usleep(500000);
