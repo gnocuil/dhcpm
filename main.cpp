@@ -236,18 +236,22 @@ void html_write(char* htmlfile)
 	int id = 1;
 	for (int i = 0; i < leases.size(); ++i) {
 		if (it->check) {
-			int len;
-			len = it->ip.size();
-			write(fd1[1], &len, sizeof(len));
-			while (1);
-			write(fd1[1], it->ip.c_str(), len);
-			len = it->ethernet.size();
-			write(fd1[1], &len, sizeof(len));
-			write(fd1[1], it->ethernet.c_str(), len);
+			int len = it->ip.size();
+			char buf[200] = {0};
+			*(int*)buf = len;
+			strcpy(buf + 4, it->ip.c_str());
+			int len2 = it->ethernet.size();
+			*(int*)(buf + 4 + len) = len2;
+			strcpy(buf + 4 + len + 4, it->ethernet.c_str());
+			
+			write(fd1[1], buf, 4 + len + 4 + len2);
 			
 			Info info;
 			memset(&info, 0, sizeof(info));
 			int count = read(fd2[0], &info, sizeof(info));
+			if (count != sizeof(info)) {
+				fprintf(stderr, "father: %d/%d\n", count, sizeof(info));
+			}
 			
 			fprintf(fout, "<tr>\n");
 			fprintf(fout, "\t<td>%d</td>\n", id++);
