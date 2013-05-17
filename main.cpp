@@ -244,11 +244,12 @@ void html_write(char* htmlfile)
 			*(int*)(buf + 4 + len) = len2;
 			strcpy(buf + 4 + len + 4, it->ethernet.c_str());
 			
-			write(fd1[1], buf, 4 + len + 4 + len2);
+			int count = write(fd1[1], buf, 4 + len + 4 + len2);
+			printf("father: write %d bytes\n", count);
 			
 			Info info;
 			memset(&info, 0, sizeof(info));
-			int count = read(fd2[0], &info, sizeof(info));
+			count = read(fd2[0], &info, sizeof(info));
 			if (count != sizeof(info)) {
 				fprintf(stderr, "father: %d/%d\n", count, sizeof(info));
 			}
@@ -304,11 +305,14 @@ void son()
 		}
 		if (FD_ISSET(fd1[0], &set)) {
 			int len;
+			char buf[200];
+			int count = read(fd1[0], buf, 200);
+			printf("son: read %d bytes\n", count);
 			char ip[100] = {0};
 			char mac[100] = {0};
 			if (read(fd1[0], &len, sizeof(len)) != sizeof(len))
 				continue;
-			int count = read(fd1[0], ip, len);
+			count = read(fd1[0], ip, len);
 			if (count != len) {
 				fprintf(stderr, "son: read ip, len=%d count=%d\n", len, count);
 				for (int i = 0; i < count; ++i)
