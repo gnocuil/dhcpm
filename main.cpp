@@ -6,6 +6,14 @@
 #include <cctype>
 #include <iostream>
 #include <map>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>  
+#include <netinet/udp.h> 
+#include <linux/if_packet.h>
+#include <linux/if_ether.h>
+#include <errno.h>
+#include <arpa/inet.h>
 
 using namespace std;
 
@@ -17,6 +25,27 @@ struct lease {
 	string ends;
 	bool check;
 }; 
+
+struct info {
+	string eth;
+	uint64_t in_pkts;
+	uint64_t out_pkts;
+	uint64_t in_bytes;
+	uint64_t out_bytes;
+	time_t seconds;
+	
+	void clear(const string& neweth) {
+		eth = neweth;
+		in_pkts = 0;
+		out_pkts = 0;
+		in_bytes = 0;
+		out_bytes = 0;
+		seconds = 0;
+	}
+};
+
+int fd1[2];//father -> son
+int fd2[2];//father <- son
 
 list<lease> leases;
 map<string, string> mp;
@@ -182,6 +211,11 @@ void html_write(char* htmlfile)
 	fprintf(fout, "\t<th>Start Time</th>\n");
 	fprintf(fout, "\t<th>End Time</th>\n");
 	fprintf(fout, "\t<th>Time Remaining</th>\n");
+	fprintf(fout, "\t<th>Upload Packets</th>\n");
+	fprintf(fout, "\t<th>Download Packets</th>\n");
+	fprintf(fout, "\t<th>Upload Bytes</th>\n");
+	fprintf(fout, "\t<th>Download Bytes</th>\n");
+	fprintf(fout, "\t<th>Last Communication</th>\n");
 	fprintf(fout, "</tr>\n");
 	
 	it = leases.begin();
@@ -196,6 +230,11 @@ void html_write(char* htmlfile)
 			fprintf(fout, "\t<td>%s</td>\n", it->starts.c_str());
 			fprintf(fout, "\t<td>%s</td>\n", it->ends.c_str());
 			fprintf(fout, "\t<td>%s</td>\n", remainingtime(calctime(it->ends.c_str()) - servertime).c_str());
+			fprintf(fout, "\t<td>%d</td>\n", 0);
+			fprintf(fout, "\t<td>%d</td>\n", 0);
+			fprintf(fout, "\t<td>%d</td>\n", 0);
+			fprintf(fout, "\t<td>%d</td>\n", 0);
+			fprintf(fout, "\t<td>%s ago</td>\n", "TODO");
 			fprintf(fout, "</tr>\n");
 		}
 		it++;
@@ -207,12 +246,61 @@ void html_write(char* htmlfile)
 	rename((string(htmlfile) + ".buf").c_str(), htmlfile);
 }
 
+void son()
+{
+	int raw_fd = socket(AF_PACKET, SOCK_DGRAM, htons(ETH_P_ALL));
+	if (raw_fd < 0) {
+		fprintf(stderr, "Error creating socket\n");
+		return;
+	}
+	fd_set set;
+	int maxsock = max(raw_fd, fd1[0]) + 1;
+	while (1) {
+		FD_ZERO(&set);
+		FD_SET(fd1[0], &set);
+		FD_SET(raw_fd, &set);
+		int ret = select(maxsock + 1, &set, NULL, NULL, NULL);
+		if (ret < 0) {
+			fprintf(stderr, "Error in select()\n");
+			continue;
+		}
+		if (FD_ISSET(fd1[0], &set)) {
+			uint32_t ip;
+			int count = read(fd1[0], &ip, 4);
+			printf("son: pipe read %d bytes\n", count);
+		} else if (FD_ISSET(raw_fd, &set)) {
+			char buf[2000];
+			int count = recv(raw_fd, buf, 2000, 0);
+			printf("son: socket read %d bytes\n", count);
+			
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 3)
 		usage();
 	fprintf(stderr, "lease file : %s\n", argv[1]);
 	fprintf(stderr, "output html: %s\n", argv[2]);
+	
+	if (pipe(fd1) < 0) {
+		fprintf(stderr, "Error in pipe()\n");
+	}
+	if (pipe(fd2) < 0) {
+		fprintf(stderr, "Error in pipe()\n");
+	}
+	int pid = fork();
+	if (pid == 0) {//son
+		close(fd1[1]);
+		close(fd2[0]);
+		son();
+		return 0;
+	} else {//father
+		close(fd1[0]);
+		close(fd2[1]);
+	}
+	char ip[4] = {0x1, 0x2, 0x3, 0x4};
 	while (1) {
 		if (lease_read(argv[1]))
 			html_write(argv[2]);
