@@ -239,10 +239,8 @@ void html_write(char* htmlfile)
 	fprintf(fout, "\t<th>Start Time</th>\n");
 	fprintf(fout, "\t<th>End Time</th>\n");
 	fprintf(fout, "\t<th>Time Remaining</th>\n");
-	fprintf(fout, "\t<th>Upload Packets</th>\n");
-	fprintf(fout, "\t<th>Download Packets</th>\n");
-	fprintf(fout, "\t<th>Upload Bytes</th>\n");
-	fprintf(fout, "\t<th>Download Bytes</th>\n");
+	fprintf(fout, "\t<th>Upload</th>\n");
+	fprintf(fout, "\t<th>Download</th>\n");
 	fprintf(fout, "\t<th>Last Active</th>\n");
 	fprintf(fout, "</tr>\n");
 	
@@ -276,10 +274,8 @@ void html_write(char* htmlfile)
 			fprintf(fout, "\t<td>%s</td>\n", it->starts.c_str());
 			fprintf(fout, "\t<td>%s</td>\n", it->ends.c_str());
 			fprintf(fout, "\t<td>%s</td>\n", remainingtime(calctime(it->ends.c_str()) - servertime).c_str());
-			fprintf(fout, "\t<td>%d</td>\n", info.out_pkts);
-			fprintf(fout, "\t<td>%d</td>\n", info.in_pkts);
-			fprintf(fout, "\t<td>%s</td>\n", bytes(info.out_bytes).c_str());
-			fprintf(fout, "\t<td>%s</td>\n", bytes(info.in_bytes).c_str());
+			fprintf(fout, "\t<td>%s (%d pkts)</td>\n", bytes(info.out_bytes).c_str(), info.out_pkts);
+			fprintf(fout, "\t<td>%s (%d pkts)</td>\n", bytes(info.in_bytes).c_str(), info.in_pkts);
 			fprintf(fout, "\t<td>%s</td>\n", info.seconds <= 0 ? "N/A" : remainingtime(timer - info.seconds, true).c_str());
 			fprintf(fout, "</tr>\n");
 		}
