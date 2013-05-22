@@ -352,7 +352,7 @@ void son()
 				mp_ip[iphdr->ip_src.s_addr].out_bytes += count;
 				mp_ip[iphdr->ip_src.s_addr].seconds = tv.tv_sec;
 			}
-			if (mp_valid[iphdr->ip_dst.s_addr]) {
+			if (mp_valid.count(iphdr->ip_dst.s_addr)) {
 				mp_ip[iphdr->ip_dst.s_addr].in_pkts ++;
 				mp_ip[iphdr->ip_dst.s_addr].in_bytes += count;
 			}
