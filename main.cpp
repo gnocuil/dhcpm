@@ -190,7 +190,7 @@ string bytes(uint64_t b)
 }
 
 void html_write(char* htmlfile)
-{
+{printf("html_write: %s\n", (string(htmlfile) + ".buf").c_str());
 	FILE *fout = fopen((string(htmlfile) + ".buf").c_str(), "w");
 	if (!fout) return;
 //	fprintf(fout, "<html>\n");
@@ -226,10 +226,9 @@ void html_write(char* htmlfile)
 			it->check = false;
                 it++;
         }	
-
 	fprintf(fout, "<p>Total clients : %d</p>\n", total);
-	fprintf(fout, "<p>Android Devices : %d/%d (%d%%)</p>\n", android, total, android * 100 / total);
-	fprintf(fout, "<p>iOS Devices: %d/%d (%d%%)</p>\n", ios, total, ios * 100 / total);
+	fprintf(fout, "<p>Android Devices : %d/%d (%d%%)</p>\n", android, total, !total ? 0 : android * 100 / total);
+	fprintf(fout, "<p>iOS Devices: %d/%d (%d%%)</p>\n", ios, total, !total ? 0 : ios * 100 / total);
 	fprintf(fout, "<table class=\"cbi-section-table\" id=\"lease_status_table\">\n");
 	fprintf(fout, "<tr>\n");
 	fprintf(fout, "\t<th>#</th>\n");
@@ -243,7 +242,6 @@ void html_write(char* htmlfile)
 	fprintf(fout, "\t<th>Download</th>\n");
 	fprintf(fout, "\t<th>Last Active</th>\n");
 	fprintf(fout, "</tr>\n");
-	
 	it = leases.begin();
 	int id = 1;
 	for (int i = 0; i < leases.size(); ++i) {
@@ -317,7 +315,7 @@ void son()
 			int len;
 			char buf[200];
 			int count = read(fd1[0], buf, 200);
-			printf("son: read %d bytes\n", count);
+			printf("son: read %d bytes\n", count);//if (!count) continue;
 			char ip[100] = {0};
 			char mac[100] = {0};
 			int len1 = *(int*)buf;
